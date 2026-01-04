@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Documentation
+docs/
+*.md
+
+# Tests (not needed in production image)
+tests/
+
+# Cache
+.ruff_cache/
+.mypy_cache/
