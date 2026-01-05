@@ -19,7 +19,7 @@ class CSVRepository:
         "currency",
         "institution",
         "payment_instrument",
-        "raw_reference",
+        "notes",
     ]
 
     def __init__(self, ledger_path: Path | None = None):
@@ -106,6 +106,58 @@ class CSVRepository:
             pass
         return transactions
 
+    def delete(self, global_id: str) -> bool:
+        """Delete a transaction by its global_id.
+
+        Args:
+            global_id: The unique identifier of the transaction to delete.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        transactions = self.get_all()
+        original_count = len(transactions)
+        filtered = [txn for txn in transactions if txn.global_id != global_id]
+
+        if len(filtered) == original_count:
+            return False
+
+        self._write_all(filtered)
+        return True
+
+    def update(self, global_id: str, transaction: Transaction) -> bool:
+        """Update a transaction by its global_id.
+
+        Args:
+            global_id: The unique identifier of the transaction to update.
+            transaction: The new transaction data.
+
+        Returns:
+            True if updated, False if not found.
+        """
+        transactions = self.get_all()
+        found = False
+
+        for i, txn in enumerate(transactions):
+            if txn.global_id == global_id:
+                transactions[i] = transaction
+                found = True
+                break
+
+        if not found:
+            return False
+
+        self._write_all(transactions)
+        return True
+
+    def _write_all(self, transactions: list[Transaction]) -> None:
+        """Rewrite the entire ledger with the given transactions."""
+        with open(self.ledger_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=self.FIELDNAMES)
+            writer.writeheader()
+            for txn in transactions:
+                writer.writerow(self._transaction_to_row(txn))
+
     def _transaction_to_row(self, txn: Transaction) -> dict:
         """Convert Transaction to CSV row dict."""
         return {
@@ -116,7 +168,7 @@ class CSVRepository:
             "currency": txn.currency,
             "institution": txn.institution,
             "payment_instrument": txn.payment_instrument,
-            "raw_reference": txn.raw_reference,
+            "notes": txn.notes,
         }
 
     def _row_to_transaction(self, row: dict) -> Transaction | None:
@@ -125,11 +177,11 @@ class CSVRepository:
             return Transaction(
                 timestamp=datetime.fromisoformat(row["timestamp"]),
                 merchant=row["merchant"],
-                amount=int(row["amount"]),
+                amount=float(row["amount"]),
                 currency=row["currency"],
                 institution=row["institution"],
                 payment_instrument=row["payment_instrument"],
-                raw_reference=row["raw_reference"],
+                notes=row.get("notes", ""),
             )
         except (KeyError, ValueError):
             return None

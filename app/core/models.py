@@ -11,11 +11,11 @@ class Transaction(BaseModel):
 
     timestamp: datetime = Field(description="Transaction timestamp in ISO 8601")
     merchant: str = Field(description="Merchant or payee name")
-    amount: int = Field(description="Amount in minor units (cents)")
+    amount: float = Field(description="Amount in dollars with cents (e.g., 10.99)")
     currency: str = Field(description="Currency code (CRC, USD)")
     institution: str = Field(description="Financial institution (BAC, Davivienda)")
     payment_instrument: str = Field(description="Last 4 digits of card/account")
-    raw_reference: str = Field(description="Original reference from email")
+    notes: str = Field(default="", description="User notes for the transaction")
 
     @computed_field
     @property
@@ -45,3 +45,27 @@ class BackfillRequest(BaseModel):
 
     start_date: date = Field(description="Start date in YYYY-MM-DD format")
     end_date: date = Field(description="End date in YYYY-MM-DD format")
+
+
+class TransactionUpdate(BaseModel):
+    """Request body for updating a transaction."""
+
+    timestamp: datetime = Field(description="Transaction timestamp in ISO 8601")
+    merchant: str = Field(description="Merchant or payee name")
+    amount: float = Field(description="Amount in dollars with cents (e.g., 10.99)")
+    currency: str = Field(description="Currency code (CRC, USD)")
+    institution: str = Field(description="Financial institution (BAC, Davivienda)")
+    payment_instrument: str = Field(description="Last 4 digits of card/account")
+    notes: str = Field(default="", description="User notes for the transaction")
+
+    def to_transaction(self) -> "Transaction":
+        """Convert to Transaction model."""
+        return Transaction(
+            timestamp=self.timestamp,
+            merchant=self.merchant,
+            amount=self.amount,
+            currency=self.currency,
+            institution=self.institution,
+            payment_instrument=self.payment_instrument,
+            notes=self.notes,
+        )

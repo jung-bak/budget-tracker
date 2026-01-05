@@ -1,13 +1,6 @@
 """Tests for FastAPI endpoints."""
 
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_root_endpoint():
+def test_root_endpoint(client):
     """Health check should return healthy status."""
     response = client.get("/")
     assert response.status_code == 200
@@ -16,14 +9,14 @@ def test_root_endpoint():
     assert "supported_institutions" in data
 
 
-def test_get_transactions_empty():
+def test_get_transactions_empty(client):
     """Get transactions should return list (may be empty)."""
     response = client.get("/transactions")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
-def test_get_summary():
+def test_get_summary(client):
     """Summary endpoint should return valid structure."""
     response = client.get("/transactions/summary")
     assert response.status_code == 200

@@ -1,3 +1,4 @@
+
 # Environment and secrets - NEVER commit these
 .env
 .env.local
@@ -5,6 +6,9 @@
 *.pem
 *.key
 credentials.json
+
+# App Data
+data/ledger.csv
 
 # Python
 __pycache__/

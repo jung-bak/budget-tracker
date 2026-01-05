@@ -13,20 +13,15 @@ from app.parsers.strategies.base import ParserStrategy
 class BACParserStrategy(ParserStrategy):
     """Parser for BAC Credomatic transaction notification emails."""
 
-    BAC_SENDERS = [
-        "notificaciones@baccredomatic.com",
-        "alertas@baccredomatic.com",
-        "noreply@baccredomatic.com",
-    ]
+    SUBJECT_PATTERN = "Notificación de transacción"
 
     @property
     def institution(self) -> str:
         return "BAC"
 
     def can_parse(self, email: EmailMessage) -> bool:
-        """Check if email is from BAC."""
-        sender_lower = email.sender.lower()
-        return any(bac_sender in sender_lower for bac_sender in self.BAC_SENDERS)
+        """Check if email is a BAC transaction notification by subject."""
+        return self.SUBJECT_PATTERN in email.subject
 
     def parse(self, email: EmailMessage) -> Transaction | None:
         """Parse BAC transaction email using BeautifulSoup."""
@@ -51,7 +46,7 @@ class BACParserStrategy(ParserStrategy):
                 currency=currency,
                 institution=self.institution,
                 payment_instrument=card_last4,
-                raw_reference=email.subject,
+                notes="",
             )
         except Exception:
             return None
@@ -77,8 +72,8 @@ class BACParserStrategy(ParserStrategy):
 
         return ""
 
-    def _extract_amount(self, soup: BeautifulSoup) -> tuple[int, str]:
-        """Extract amount in minor units and currency."""
+    def _extract_amount(self, soup: BeautifulSoup) -> tuple[float, str]:
+        """Extract amount in dollars with cents and currency."""
         amount_pattern = re.compile(
             r"(?:USD|CRC|₡|\$)\s*([\d,]+\.?\d*)|"
             r"([\d,]+\.?\d*)\s*(?:USD|CRC|colones|dólares)"
@@ -97,10 +92,10 @@ class BACParserStrategy(ParserStrategy):
         if match:
             return self._parse_amount_string(match.group(0))
 
-        return 0, "USD"
+        return 0.0, "USD"
 
-    def _parse_amount_string(self, amount_str: str) -> tuple[int, str]:
-        """Parse amount string to minor units and currency."""
+    def _parse_amount_string(self, amount_str: str) -> tuple[float, str]:
+        """Parse amount string to dollars with cents and currency."""
         currency = "USD"
         if "CRC" in amount_str or "₡" in amount_str or "colones" in amount_str.lower():
             currency = "CRC"
@@ -123,10 +118,9 @@ class BACParserStrategy(ParserStrategy):
                 numeric = numeric.replace(",", "")
 
         try:
-            amount_float = float(numeric)
-            return int(amount_float * 100), currency
+            return round(float(numeric), 2), currency
         except ValueError:
-            return 0, currency
+            return 0.0, currency
 
     def _extract_card(self, soup: BeautifulSoup) -> str:
         """Extract last 4 digits of card."""

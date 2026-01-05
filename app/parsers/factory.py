@@ -3,7 +3,7 @@
 from app.adapters.imap_client import EmailMessage
 from app.parsers.strategies.bac import BACParserStrategy
 from app.parsers.strategies.base import ParserStrategy
-from app.parsers.strategies.davivienda import DaviviendaParserStrategy
+from app.parsers.strategies.davibank import DavibankParserStrategy
 
 
 class ParserFactory:
@@ -12,7 +12,7 @@ class ParserFactory:
     def __init__(self):
         self._strategies: list[ParserStrategy] = [
             BACParserStrategy(),
-            DaviviendaParserStrategy(),
+            DavibankParserStrategy(),
         ]
 
     def get_strategy(self, email: EmailMessage) -> ParserStrategy | None:

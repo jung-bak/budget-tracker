@@ -1,11 +1,15 @@
 """FastAPI application entry point."""
 
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 
 from app.adapters.imap_client import ImapAdapter
 from app.core.config import settings
-from app.core.models import BackfillRequest, SyncResult, Transaction
+from app.core.models import BackfillRequest, SyncResult, Transaction, TransactionUpdate
 from app.parsers.factory import ParserFactory
 from app.repositories.csv_repo import CSVRepository
 
@@ -149,3 +153,57 @@ def get_summary():
             curr: amt / 100 for curr, amt in total_by_currency.items()
         },
     }
+
+
+@app.delete("/transactions/{global_id}")
+def delete_transaction(global_id: str, _: str = Depends(get_api_key)):
+    """Delete a transaction by its global_id.
+
+    Args:
+        global_id: The unique identifier of the transaction to delete.
+
+    Returns:
+        Success message or 404 if not found.
+    """
+    if csv_repo.delete(global_id):
+        return {"message": "Transaction deleted", "global_id": global_id}
+    raise HTTPException(status_code=404, detail="Transaction not found")
+
+
+@app.put("/transactions/{global_id}", response_model=Transaction)
+def update_transaction(
+    global_id: str,
+    update: TransactionUpdate,
+    _: str = Depends(get_api_key),
+):
+    """Update a transaction by its global_id.
+
+    Args:
+        global_id: The unique identifier of the transaction to update.
+        update: The new transaction data.
+
+    Returns:
+        The updated Transaction or 404 if not found.
+    """
+    transaction = update.to_transaction()
+    if csv_repo.update(global_id, transaction):
+        return transaction
+    raise HTTPException(status_code=404, detail="Transaction not found")
+
+
+# Static files directory
+static_dir = Path(__file__).parent.parent / "static"
+static_dir.mkdir(exist_ok=True)
+
+
+@app.get("/ui")
+def serve_ui():
+    """Serve the web UI."""
+    index_path = static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="UI not found")
+
+
+# Mount static files for assets
+app.mount("/static", StaticFiles(directory=static_dir), name="static")

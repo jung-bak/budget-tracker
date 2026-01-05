@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email-to-Ledger | Transaction Manager</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">Email-to-Ledger</h1>
+                <div class="header-actions">
+                    <button id="syncBtn" class="btn btn-primary">
+                        <span class="btn-icon">&#x21bb;</span>
+                        Sync
+                    </button>
+                    <button id="backfillBtn" class="btn btn-secondary">
+                        <span class="btn-icon">&#x1F4C5;</span>
+                        Backfill
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">
+                    <span class="stat-label">Transactions</span>
+                    <span class="stat-value" id="statTotal">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">USD Total</span>
+                    <span class="stat-value" id="statUSD">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">CRC Total</span>
+                    <span class="stat-value" id="statCRC">-</span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Merchant</th>
+                            <th>Amount</th>
+                            <th>Institution</th>
+                            <th>Card</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                        <tr class="empty-row">
+                            <td colspan="6">No transactions loaded. Click "Sync" to fetch.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        <div class="toast-container" id="toastContainer"></div>
+
+        <!-- Edit Modal -->
+        <div class="modal" id="editModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Transaction</h2>
+                    <button class="modal-close" id="editModalClose">&times;</button>
+                </div>
+                <form id="editForm" class="modal-form">
+                    <input type="hidden" id="editGlobalId">
+                    <div class="form-group">
+                        <label for="editMerchant">Merchant</label>
+                        <input type="text" id="editMerchant" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editAmount">Amount</label>
+                            <input type="number" id="editAmount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCurrency">Currency</label>
+                            <select id="editCurrency" required>
+                                <option value="USD">USD</option>
+                                <option value="CRC">CRC</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editInstitution">Institution</label>
+                            <input type="text" id="editInstitution" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editPaymentInstrument">Card (last 4)</label>
+                            <input type="text" id="editPaymentInstrument" maxlength="4" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editTimestamp">Timestamp</label>
+                        <input type="datetime-local" id="editTimestamp" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editNotes">Notes</label>
+                        <input type="text" id="editNotes">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-ghost" id="editCancelBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Backfill Modal -->
+        <div class="modal" id="backfillModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Backfill Transactions</h2>
+                    <button class="modal-close" id="backfillModalClose">&times;</button>
+                </div>
+                <form id="backfillForm" class="modal-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="backfillStart">Start Date</label>
+                            <input type="date" id="backfillStart" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="backfillEnd">End Date</label>
+                            <input type="date" id="backfillEnd" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-ghost" id="backfillCancelBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Run Backfill</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div class="modal" id="deleteModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Delete Transaction</h2>
+                    <button class="modal-close" id="deleteModalClose">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this transaction?</p>
+                    <p class="delete-info" id="deleteInfo"></p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="deleteCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Key Modal -->
+        <div class="modal" id="apiKeyModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>API Key Required</h2>
+                </div>
+                <form id="apiKeyForm" class="modal-form">
+                    <div class="form-group">
+                        <label for="apiKeyInput">Enter your API Key</label>
+                        <input type="password" id="apiKeyInput" required placeholder="X-API-Key">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-"""Davivienda bank email parser using regex."""
+"""Davibank email parser using regex."""
 
 import re
 from datetime import datetime
@@ -8,26 +8,21 @@ from app.core.models import Transaction
 from app.parsers.strategies.base import ParserStrategy
 
 
-class DaviviendaParserStrategy(ParserStrategy):
-    """Parser for Davivienda transaction notification emails."""
+class DavibankParserStrategy(ParserStrategy):
+    """Parser for Davibank transaction notification emails."""
 
-    DAVIVIENDA_SENDERS = [
-        "notificaciones@davivienda.com",
-        "alertas@davivienda.cr",
-        "avisos@davivienda.com",
-    ]
+    SUBJECT_PATTERN = "Alerta Transacción Tarjeta de Crédito Titular"
 
     @property
     def institution(self) -> str:
-        return "Davivienda"
+        return "Davibank"
 
     def can_parse(self, email: EmailMessage) -> bool:
-        """Check if email is from Davivienda."""
-        sender_lower = email.sender.lower()
-        return any(dav in sender_lower for dav in self.DAVIVIENDA_SENDERS)
+        """Check if email is a Davibank transaction notification by subject."""
+        return self.SUBJECT_PATTERN in email.subject
 
     def parse(self, email: EmailMessage) -> Transaction | None:
-        """Parse Davivienda transaction email using regex on plain text."""
+        """Parse Davibank transaction email using regex on plain text."""
         text = email.text_body or email.html_body
         if not text:
             return None
@@ -55,24 +50,25 @@ class DaviviendaParserStrategy(ParserStrategy):
 
     def _extract_merchant(self, text: str) -> str:
         """Extract merchant name from text."""
+        # Pattern for: "transacción realizada en MERCHANT, el día"
+        match = re.search(
+            r"transacci[óo]n\s+realizada\s+en\s+(.+?),\s*el\s+d[íi]a",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
+
+        # Fallback patterns
         patterns = [
             r"(?:Comercio|Establecimiento|Merchant)[:\s]+([A-Za-z0-9\s\-\.]+)",
-            r"(?:en|at)\s+([A-Z][A-Za-z0-9\s\-\.]{3,30})",
             r"compra\s+(?:en|at)\s+([A-Za-z0-9\s\-\.]+)",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                merchant = match.group(1).strip()
-                # Clean up common trailing words
-                merchant = re.sub(
-                    r"\s+(por|por un monto|monto|tarjeta).*$",
-                    "",
-                    merchant,
-                    flags=re.IGNORECASE,
-                )
-                return merchant.strip()
+                return match.group(1).strip()
 
         return ""
 
@@ -139,6 +135,19 @@ class DaviviendaParserStrategy(ParserStrategy):
 
     def _extract_timestamp(self, text: str, email: EmailMessage) -> datetime:
         """Extract transaction timestamp or fall back to email date."""
+        # Pattern for: "el día 02/01/2026 a las 08:54 PM"
+        match = re.search(
+            r"el\s+d[íi]a\s+(\d{1,2}/\d{1,2}/\d{4})\s+a\s+las?\s+(\d{1,2}:\d{2})\s*(AM|PM)?",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            date_str = match.group(1)
+            time_str = match.group(2)
+            am_pm = match.group(3)
+            return self._parse_date(date_str, time_str, am_pm)
+
+        # Fallback patterns
         patterns = [
             r"(?:Fecha|Date)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})"
             r"(?:\s+(\d{1,2}:\d{2}(?::\d{2})?))?",
@@ -154,8 +163,33 @@ class DaviviendaParserStrategy(ParserStrategy):
 
         return datetime.combine(email.date, datetime.min.time())
 
-    def _parse_date(self, date_str: str, time_str: str | None = None) -> datetime:
-        """Parse date and optional time string."""
+    def _parse_date(
+        self, date_str: str, time_str: str | None = None, am_pm: str | None = None
+    ) -> datetime:
+        """Parse date and optional time string with AM/PM support."""
+        try:
+            # Parse date (DD/MM/YYYY)
+            day, month, year = date_str.split("/")
+            parsed_date = datetime(int(year), int(month), int(day))
+
+            # Parse time if provided
+            if time_str:
+                hour, minute = map(int, time_str.split(":"))
+
+                # Handle AM/PM
+                if am_pm:
+                    if am_pm.upper() == "PM" and hour != 12:
+                        hour += 12
+                    elif am_pm.upper() == "AM" and hour == 12:
+                        hour = 0
+
+                parsed_date = parsed_date.replace(hour=hour, minute=minute)
+
+            return parsed_date
+        except (ValueError, AttributeError):
+            pass
+
+        # Fallback: try standard formats
         full_str = date_str
         if time_str:
             full_str = f"{date_str} {time_str}"
