@@ -12,7 +12,9 @@ class CategoryRepository:
     FIELDNAMES = ["merchant", "category"]
 
     def __init__(self, mappings_path: Path | None = None):
-        self.mappings_path = mappings_path or (settings.data_dir / "merchant_categories.csv")
+        self.mappings_path = mappings_path or (
+            settings.data_dir / "merchant_categories.csv"
+        )
         self._ensure_file_exists()
         self._cache: dict[str, str] = {}
         self._load_cache()

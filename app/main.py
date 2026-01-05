@@ -31,6 +31,7 @@ async def get_api_key(api_key: str | None = Depends(api_key_header)) -> str:
         )
     return api_key
 
+
 app = FastAPI(
     title="Email-to-Ledger API",
     description="Universal Transaction Gateway - Ingest bank transaction emails",
@@ -111,7 +112,9 @@ def backfill_emails(request: BackfillRequest, _: str = Depends(get_api_key)):
     result = SyncResult()
 
     try:
-        for email in imap_adapter.fetch_by_date_range(request.start_date, request.end_date):
+        for email in imap_adapter.fetch_by_date_range(
+            request.start_date, request.end_date
+        ):
             strategy = parser_factory.get_strategy(email)
             if not strategy:
                 result.skipped += 1

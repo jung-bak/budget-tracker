@@ -73,7 +73,9 @@ class TestCSVRepositoryDelete:
         result = temp_repo.delete("nonexistent-id")
         assert result is False
 
-    def test_delete_one_of_many(self, temp_repo, sample_transaction, another_transaction):
+    def test_delete_one_of_many(
+        self, temp_repo, sample_transaction, another_transaction
+    ):
         """Should only delete the specified transaction."""
         temp_repo.save(sample_transaction)
         temp_repo.save(another_transaction)
@@ -179,6 +181,7 @@ class TestCRUDEndpoints:
     def test_delete_requires_api_key(self):
         """DELETE should require API key authentication."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client_no_auth = TestClient(app)
@@ -188,6 +191,7 @@ class TestCRUDEndpoints:
     def test_update_requires_api_key(self):
         """PUT should require API key authentication."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client_no_auth = TestClient(app)

@@ -1,5 +1,6 @@
 """Tests for FastAPI endpoints."""
 
+
 def test_health_endpoint(client):
     """Health check should return healthy status."""
     response = client.get("/health")

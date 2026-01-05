@@ -1,5 +1,5 @@
-
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,6 +10,7 @@ os.environ["IMAP_USER"] = "test@test.com"
 os.environ["IMAP_PASSWORD"] = "test-pass"
 
 from app.main import app
+
 
 @pytest.fixture
 def client():

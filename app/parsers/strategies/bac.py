@@ -167,9 +167,18 @@ class BACParserStrategy(ParserStrategy):
     def _parse_spanish_date(self, date_str: str) -> datetime:
         """Parse Spanish date format like 'Ene 3, 2026, 18:42'."""
         months = {
-            "ene": 1, "feb": 2, "mar": 3, "abr": 4,
-            "may": 5, "jun": 6, "jul": 7, "ago": 8,
-            "sep": 9, "oct": 10, "nov": 11, "dic": 12,
+            "ene": 1,
+            "feb": 2,
+            "mar": 3,
+            "abr": 4,
+            "may": 5,
+            "jun": 6,
+            "jul": 7,
+            "ago": 8,
+            "sep": 9,
+            "oct": 10,
+            "nov": 11,
+            "dic": 12,
         }
 
         try:
