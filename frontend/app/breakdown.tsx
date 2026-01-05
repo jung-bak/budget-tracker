@@ -23,6 +23,7 @@ export default function BreakdownScreen() {
   const [loading, setLoading] = useState(true);
   const [targetCurrency, setTargetCurrency] = useState<'USD' | 'CRC'>('USD');
   const [exchangeRate, setExchangeRate] = useState('515');
+  const [rateError, setRateError] = useState<string | null>(null);
 
   useEffect(() => {
     loadTransactions();
@@ -30,12 +31,18 @@ export default function BreakdownScreen() {
 
   const loadTransactions = async () => {
     try {
-      const [data, rateData] = await Promise.all([
-        api.getTransactions(),
-        api.getExchangeRate().catch(() => ({ rate: 515 })) // Fallback if fails
-      ]);
+      setRateError(null);
+      const data = await api.getTransactions();
       setTransactions(data);
-      setExchangeRate(rateData.rate.toString());
+
+      try {
+        const rateData = await api.getExchangeRate();
+        setExchangeRate(rateData.rate.toString());
+      } catch (e: any) {
+        console.error('Failed to load exchange rate', e);
+        // If it's an API Error, show the message, otherwise generic
+        setRateError(e.message || 'Failed to fetch rate');
+      }
     } catch (error) {
       console.error('Failed to load data', error);
     } finally {
@@ -129,9 +136,11 @@ export default function BreakdownScreen() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Rate:</Text>
+          <Text style={[styles.inputLabel, rateError ? styles.errorText : null]}>
+            {rateError ? 'Rate Error:' : 'Rate:'}
+          </Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, rateError ? styles.inputError : null]}
             value={exchangeRate}
             onChangeText={setExchangeRate}
             keyboardType="numeric"
@@ -140,6 +149,11 @@ export default function BreakdownScreen() {
           />
         </View>
       </View>
+      {rateError && (
+        <Text style={styles.errorMessage}>
+          {rateError} - using fallback
+        </Text>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.chartContainer}>
@@ -329,5 +343,19 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: fontSize.xs,
     textAlign: 'right',
+  },
+  errorText: {
+    color: colors.danger,
+  },
+  inputError: {
+    borderColor: colors.danger,
+    borderWidth: 1,
+  },
+  errorMessage: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    marginTop: -spacing.sm,
   },
 });
