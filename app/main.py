@@ -11,6 +11,7 @@ from app.adapters.imap_client import ImapAdapter
 from app.core.config import settings
 from app.core.models import BackfillRequest, SyncResult, Transaction, TransactionUpdate
 from app.parsers.factory import ParserFactory
+from app.repositories.category_repo import CategoryRepository
 from app.repositories.csv_repo import CSVRepository
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -40,10 +41,11 @@ app = FastAPI(
 imap_adapter = ImapAdapter()
 parser_factory = ParserFactory()
 csv_repo = CSVRepository()
+category_repo = CategoryRepository()
 
 
-@app.get("/")
-def root():
+@app.get("/health")
+def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
@@ -70,6 +72,20 @@ def sync_emails(_: str = Depends(get_api_key)):
 
             transaction = strategy.parse(email)
             if transaction:
+                # Auto-categorize based on merchant
+                if transaction.category is None:
+                    category = category_repo.get_category(transaction.merchant)
+                    if category:
+                        transaction = Transaction(
+                            timestamp=transaction.timestamp,
+                            merchant=transaction.merchant,
+                            amount=transaction.amount,
+                            currency=transaction.currency,
+                            institution=transaction.institution,
+                            payment_instrument=transaction.payment_instrument,
+                            notes=transaction.notes,
+                            category=category,
+                        )
                 if csv_repo.save(transaction):
                     result.processed += 1
                 else:
@@ -103,6 +119,20 @@ def backfill_emails(request: BackfillRequest, _: str = Depends(get_api_key)):
 
             transaction = strategy.parse(email)
             if transaction:
+                # Auto-categorize based on merchant
+                if transaction.category is None:
+                    category = category_repo.get_category(transaction.merchant)
+                    if category:
+                        transaction = Transaction(
+                            timestamp=transaction.timestamp,
+                            merchant=transaction.merchant,
+                            amount=transaction.amount,
+                            currency=transaction.currency,
+                            institution=transaction.institution,
+                            payment_instrument=transaction.payment_instrument,
+                            notes=transaction.notes,
+                            category=category,
+                        )
                 if csv_repo.save(transaction):
                     result.processed += 1
                 else:
@@ -130,13 +160,15 @@ def get_summary():
     """Get summary statistics of stored transactions.
 
     Returns:
-        Summary including total count, by institution, and by currency.
+        Summary including total count, by institution, by currency, and by category.
     """
     transactions = csv_repo.get_all()
 
     by_institution: dict[str, int] = {}
     by_currency: dict[str, int] = {}
-    total_by_currency: dict[str, int] = {}
+    by_category: dict[str, int] = {}
+    total_by_currency: dict[str, float] = {}
+    total_by_category: dict[str, float] = {}
 
     for txn in transactions:
         by_institution[txn.institution] = by_institution.get(txn.institution, 0) + 1
@@ -145,12 +177,20 @@ def get_summary():
             total_by_currency.get(txn.currency, 0) + txn.amount
         )
 
+        category = txn.category or "Uncategorized"
+        by_category[category] = by_category.get(category, 0) + 1
+        total_by_category[category] = total_by_category.get(category, 0) + txn.amount
+
     return {
         "total_transactions": len(transactions),
         "by_institution": by_institution,
         "by_currency": by_currency,
+        "by_category": by_category,
         "total_amount_by_currency": {
             curr: amt / 100 for curr, amt in total_by_currency.items()
+        },
+        "total_amount_by_category": {
+            cat: amt / 100 for cat, amt in total_by_category.items()
         },
     }
 
@@ -187,6 +227,9 @@ def update_transaction(
     """
     transaction = update.to_transaction()
     if csv_repo.update(global_id, transaction):
+        # Save merchant-category mapping for future auto-categorization
+        if transaction.category:
+            category_repo.set_category(transaction.merchant, transaction.category)
         return transaction
     raise HTTPException(status_code=404, detail="Transaction not found")
 
@@ -196,7 +239,7 @@ static_dir = Path(__file__).parent.parent / "static"
 static_dir.mkdir(exist_ok=True)
 
 
-@app.get("/ui")
+@app.get("/")
 def serve_ui():
     """Serve the web UI."""
     index_path = static_dir / "index.html"

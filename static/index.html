@@ -47,6 +47,7 @@
                             <th>Date</th>
                             <th>Merchant</th>
                             <th>Amount</th>
+                            <th>Category</th>
                             <th>Institution</th>
                             <th>Card</th>
                             <th>Actions</th>
@@ -54,7 +55,7 @@
                     </thead>
                     <tbody id="transactionsBody">
                         <tr class="empty-row">
-                            <td colspan="6">No transactions loaded. Click "Sync" to fetch.</td>
+                            <td colspan="7">No transactions loaded. Click "Sync" to fetch.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -103,6 +104,10 @@
                     <div class="form-group">
                         <label for="editTimestamp">Timestamp</label>
                         <input type="datetime-local" id="editTimestamp" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCategory">Category</label>
+                        <input type="text" id="editCategory" placeholder="e.g., Food, Transportation, Entertainment">
                     </div>
                     <div class="form-group">
                         <label for="editNotes">Notes</label>

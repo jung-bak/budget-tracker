@@ -202,3 +202,97 @@ class TestCRUDEndpoints:
         }
         response = client_no_auth.put("/transactions/some-id", json=update_data)
         assert response.status_code == 403
+
+
+class TestTransactionCategory:
+    """Tests for transaction categorization feature."""
+
+    def test_transaction_with_category(self, temp_repo):
+        """Should save and retrieve transaction with category."""
+        txn = Transaction(
+            timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            merchant="Grocery Store",
+            amount=50.00,
+            currency="USD",
+            institution="BAC",
+            payment_instrument="1234",
+            notes="Weekly groceries",
+            category="Food",
+        )
+
+        temp_repo.save(txn)
+        transactions = temp_repo.get_all()
+
+        assert len(transactions) == 1
+        assert transactions[0].category == "Food"
+
+    def test_transaction_without_category(self, temp_repo):
+        """Should save and retrieve transaction without category (None)."""
+        txn = Transaction(
+            timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            merchant="Random Store",
+            amount=25.00,
+            currency="USD",
+            institution="BAC",
+            payment_instrument="1234",
+        )
+
+        temp_repo.save(txn)
+        transactions = temp_repo.get_all()
+
+        assert len(transactions) == 1
+        assert transactions[0].category is None
+
+    def test_update_transaction_category(self, temp_repo, sample_transaction):
+        """Should update transaction's category."""
+        temp_repo.save(sample_transaction)
+        original_id = sample_transaction.global_id
+
+        # Create updated transaction with category
+        updated = Transaction(
+            timestamp=sample_transaction.timestamp,
+            merchant=sample_transaction.merchant,
+            amount=sample_transaction.amount,
+            currency=sample_transaction.currency,
+            institution=sample_transaction.institution,
+            payment_instrument=sample_transaction.payment_instrument,
+            notes=sample_transaction.notes,
+            category="Entertainment",
+        )
+
+        result = temp_repo.update(original_id, updated)
+
+        assert result is True
+        transactions = temp_repo.get_all()
+        assert transactions[0].category == "Entertainment"
+
+    def test_category_persists_after_rewrite(self, temp_repo):
+        """Category should persist after CSV rewrite (delete operation)."""
+        txn1 = Transaction(
+            timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            merchant="Restaurant",
+            amount=30.00,
+            currency="USD",
+            institution="BAC",
+            payment_instrument="1234",
+            category="Food",
+        )
+        txn2 = Transaction(
+            timestamp=datetime(2024, 1, 16, 12, 0, 0),
+            merchant="Gas Station",
+            amount=40.00,
+            currency="USD",
+            institution="BAC",
+            payment_instrument="1234",
+            category="Transportation",
+        )
+
+        temp_repo.save(txn1)
+        temp_repo.save(txn2)
+
+        # Delete first transaction (triggers rewrite)
+        temp_repo.delete(txn1.global_id)
+
+        transactions = temp_repo.get_all()
+        assert len(transactions) == 1
+        assert transactions[0].category == "Transportation"

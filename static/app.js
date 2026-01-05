@@ -115,7 +115,7 @@ function renderTransactions() {
     if (transactions.length === 0) {
         transactionsBody.innerHTML = `
             <tr class="empty-row">
-                <td colspan="6">No transactions loaded. Click "Sync" to fetch.</td>
+                <td colspan="7">No transactions loaded. Click "Sync" to fetch.</td>
             </tr>
         `;
         return;
@@ -131,6 +131,7 @@ function renderTransactions() {
             <td>${formatDate(txn.timestamp)}</td>
             <td>${escapeHtml(txn.merchant)}</td>
             <td class="amount-cell amount-${txn.currency.toLowerCase()}">${formatAmount(txn.amount, txn.currency)}</td>
+            <td class="category-cell">${txn.category ? escapeHtml(txn.category) : '<span class="uncategorized">-</span>'}</td>
             <td><span class="institution-badge ${getInstitutionClass(txn.institution)}">${escapeHtml(txn.institution)}</span></td>
             <td class="card-number">****${escapeHtml(txn.payment_instrument)}</td>
             <td class="action-btns">
@@ -255,6 +256,7 @@ function openEditModal(globalId) {
     document.getElementById('editCurrency').value = txn.currency;
     document.getElementById('editInstitution').value = txn.institution;
     document.getElementById('editPaymentInstrument').value = txn.payment_instrument;
+    document.getElementById('editCategory').value = txn.category || '';
     document.getElementById('editNotes').value = txn.notes || '';
 
     // Format timestamp for datetime-local input
@@ -299,12 +301,14 @@ editForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const globalId = document.getElementById('editGlobalId').value;
 
+    const categoryValue = document.getElementById('editCategory').value.trim();
     const data = {
         merchant: document.getElementById('editMerchant').value,
         amount: parseFloat(document.getElementById('editAmount').value),
         currency: document.getElementById('editCurrency').value,
         institution: document.getElementById('editInstitution').value,
         payment_instrument: document.getElementById('editPaymentInstrument').value,
+        category: categoryValue || null,
         notes: document.getElementById('editNotes').value,
         timestamp: new Date(document.getElementById('editTimestamp').value).toISOString(),
     };

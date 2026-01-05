@@ -1,8 +1,8 @@
 """Tests for FastAPI endpoints."""
 
-def test_root_endpoint(client):
+def test_health_endpoint(client):
     """Health check should return healthy status."""
-    response = client.get("/")
+    response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -24,3 +24,5 @@ def test_get_summary(client):
     assert "total_transactions" in data
     assert "by_institution" in data
     assert "by_currency" in data
+    assert "by_category" in data
+    assert "total_amount_by_category" in data

@@ -276,6 +276,14 @@ body {
     color: var(--text-muted);
 }
 
+.category-cell {
+    font-size: 13px;
+}
+
+.uncategorized {
+    color: var(--text-muted);
+}
+
 .action-btns {
     display: flex;
     gap: 8px;

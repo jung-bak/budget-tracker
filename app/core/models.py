@@ -16,6 +16,7 @@ class Transaction(BaseModel):
     institution: str = Field(description="Financial institution (BAC, Davivienda)")
     payment_instrument: str = Field(description="Last 4 digits of card/account")
     notes: str = Field(default="", description="User notes for the transaction")
+    category: str | None = Field(default=None, description="User-assigned category")
 
     @computed_field
     @property
@@ -57,6 +58,7 @@ class TransactionUpdate(BaseModel):
     institution: str = Field(description="Financial institution (BAC, Davivienda)")
     payment_instrument: str = Field(description="Last 4 digits of card/account")
     notes: str = Field(default="", description="User notes for the transaction")
+    category: str | None = Field(default=None, description="User-assigned category")
 
     def to_transaction(self) -> "Transaction":
         """Convert to Transaction model."""
@@ -68,4 +70,5 @@ class TransactionUpdate(BaseModel):
             institution=self.institution,
             payment_instrument=self.payment_instrument,
             notes=self.notes,
+            category=self.category,
         )

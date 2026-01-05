@@ -20,6 +20,7 @@ class CSVRepository:
         "institution",
         "payment_instrument",
         "notes",
+        "category",
     ]
 
     def __init__(self, ledger_path: Path | None = None):
@@ -169,11 +170,13 @@ class CSVRepository:
             "institution": txn.institution,
             "payment_instrument": txn.payment_instrument,
             "notes": txn.notes,
+            "category": txn.category or "",
         }
 
     def _row_to_transaction(self, row: dict) -> Transaction | None:
         """Convert CSV row dict to Transaction."""
         try:
+            category = row.get("category", "") or None
             return Transaction(
                 timestamp=datetime.fromisoformat(row["timestamp"]),
                 merchant=row["merchant"],
@@ -182,6 +185,7 @@ class CSVRepository:
                 institution=row["institution"],
                 payment_instrument=row["payment_instrument"],
                 notes=row.get("notes", ""),
+                category=category,
             )
         except (KeyError, ValueError):
             return None
