@@ -1,4 +1,4 @@
-"""BAC bank email parser using BeautifulSoup."""
+"""BAC bank email parser using regex."""
 
 import re
 from datetime import datetime
@@ -24,17 +24,21 @@ class BACParserStrategy(ParserStrategy):
         return self.SUBJECT_PATTERN in email.subject
 
     def parse(self, email: EmailMessage) -> Transaction | None:
-        """Parse BAC transaction email using BeautifulSoup."""
-        if not email.html_body:
+        """Parse BAC transaction email using regex on text content."""
+        # Get text content from HTML or plain text
+        if email.html_body:
+            soup = BeautifulSoup(email.html_body, "html.parser")
+            text = soup.get_text(separator="\n")
+        elif email.text_body:
+            text = email.text_body
+        else:
             return None
 
-        soup = BeautifulSoup(email.html_body, "html.parser")
-
         try:
-            merchant = self._extract_merchant(soup)
-            amount, currency = self._extract_amount(soup)
-            card_last4 = self._extract_card(soup)
-            timestamp = self._extract_timestamp(soup, email)
+            merchant = self._extract_merchant(text)
+            amount, currency = self._extract_amount(text)
+            card_last4 = self._extract_card(text)
+            timestamp = self._extract_timestamp(text, email)
 
             if not all([merchant, amount is not None, card_last4]):
                 return None
@@ -51,46 +55,46 @@ class BACParserStrategy(ParserStrategy):
         except Exception:
             return None
 
-    def _extract_merchant(self, soup: BeautifulSoup) -> str:
-        """Extract merchant name from HTML."""
-        # Look for common patterns in BAC emails
-        # Pattern 1: Table cell with "Comercio" label
-        for td in soup.find_all("td"):
-            text = td.get_text(strip=True)
-            if "Comercio" in text or "Merchant" in text:
-                next_td = td.find_next_sibling("td")
-                if next_td:
-                    return next_td.get_text(strip=True)
+    def _extract_merchant(self, text: str) -> str:
+        """Extract merchant name from text."""
+        # Pattern: "Comercio:" followed by merchant name on next line
+        match = re.search(
+            r"Comercio:\s*\n\s*(.+?)(?:\n|$)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
 
-        # Pattern 2: Look for merchant in bold or specific class
-        for strong in soup.find_all(["strong", "b"]):
-            text = strong.get_text(strip=True)
-            if text and len(text) > 3 and not any(
-                x in text.lower() for x in ["bac", "monto", "tarjeta", "fecha"]
-            ):
-                return text
+        # Fallback: look for merchant after "Comercio:" on same line
+        match = re.search(
+            r"Comercio:\s*(.+?)(?:\n|$)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
 
         return ""
 
-    def _extract_amount(self, soup: BeautifulSoup) -> tuple[float, str]:
+    def _extract_amount(self, text: str) -> tuple[float, str]:
         """Extract amount in dollars with cents and currency."""
-        amount_pattern = re.compile(
-            r"(?:USD|CRC|₡|\$)\s*([\d,]+\.?\d*)|"
-            r"([\d,]+\.?\d*)\s*(?:USD|CRC|colones|dólares)"
+        # Pattern: "Monto:" followed by currency and amount
+        match = re.search(
+            r"Monto:\s*\n?\s*((?:USD|CRC|₡|\$)\s*[\d,]+\.?\d*)",
+            text,
+            re.IGNORECASE,
         )
-
-        for td in soup.find_all("td"):
-            text = td.get_text(strip=True)
-            if "Monto" in text or "Amount" in text:
-                next_td = td.find_next_sibling("td")
-                if next_td:
-                    return self._parse_amount_string(next_td.get_text(strip=True))
-
-        # Fallback: search entire text
-        full_text = soup.get_text()
-        match = amount_pattern.search(full_text)
         if match:
-            return self._parse_amount_string(match.group(0))
+            return self._parse_amount_string(match.group(1))
+
+        # Fallback: look for currency amount pattern anywhere
+        match = re.search(
+            r"((?:USD|CRC)\s*[\d,]+\.\d{2})",
+            text,
+        )
+        if match:
+            return self._parse_amount_string(match.group(1))
 
         return 0.0, "USD"
 
@@ -122,62 +126,90 @@ class BACParserStrategy(ParserStrategy):
         except ValueError:
             return 0.0, currency
 
-    def _extract_card(self, soup: BeautifulSoup) -> str:
+    def _extract_card(self, text: str) -> str:
         """Extract last 4 digits of card."""
-        card_pattern = re.compile(r"\*{4,}(\d{4})|[Xx]{4,}(\d{4})|(\d{4})$")
-
-        for td in soup.find_all("td"):
-            text = td.get_text(strip=True)
-            if "Tarjeta" in text or "Card" in text:
-                next_td = td.find_next_sibling("td")
-                if next_td:
-                    match = card_pattern.search(next_td.get_text(strip=True))
-                    if match:
-                        return match.group(1) or match.group(2) or match.group(3)
-
-        # Fallback: search entire text
-        full_text = soup.get_text()
-        match = card_pattern.search(full_text)
+        # Pattern: asterisks followed by 4 digits
+        match = re.search(r"\*{4,}(\d{4})", text)
         if match:
-            return match.group(1) or match.group(2) or match.group(3)
+            return match.group(1)
+
+        # Fallback: X's followed by 4 digits
+        match = re.search(r"[Xx]{4,}(\d{4})", text)
+        if match:
+            return match.group(1)
 
         return ""
 
-    def _extract_timestamp(
-        self, soup: BeautifulSoup, email: EmailMessage
-    ) -> datetime:
+    def _extract_timestamp(self, text: str, email: EmailMessage) -> datetime:
         """Extract transaction timestamp or fall back to email date."""
-        date_pattern = re.compile(
-            r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*"
-            r"(?:(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:AM|PM|a\.?m\.?|p\.?m\.?)?)?"
+        # Pattern: "Fecha:" followed by date like "Ene 3, 2026, 18:42"
+        match = re.search(
+            r"Fecha:\s*\n?\s*([A-Za-z]{3,4}\s+\d{1,2},\s*\d{4},?\s*\d{1,2}:\d{2})",
+            text,
+            re.IGNORECASE,
         )
+        if match:
+            return self._parse_spanish_date(match.group(1))
 
-        for td in soup.find_all("td"):
-            text = td.get_text(strip=True)
-            if "Fecha" in text or "Date" in text:
-                next_td = td.find_next_sibling("td")
-                if next_td:
-                    match = date_pattern.search(next_td.get_text(strip=True))
-                    if match:
-                        return self._parse_date(match.group(0))
+        # Fallback: numeric date format
+        match = re.search(
+            r"Fecha:\s*\n?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*,?\s*(\d{1,2}:\d{2})?",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            date_str = match.group(1)
+            time_str = match.group(2) if match.group(2) else "00:00"
+            return self._parse_numeric_date(date_str, time_str)
 
         return datetime.combine(email.date, datetime.min.time())
 
-    def _parse_date(self, date_str: str) -> datetime:
-        """Parse various date formats."""
-        formats = [
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y %H:%M",
-            "%d/%m/%Y",
-            "%d-%m-%Y %H:%M:%S",
-            "%d-%m-%Y %H:%M",
-            "%d-%m-%Y",
-            "%m/%d/%Y %H:%M:%S",
-            "%m/%d/%Y",
-        ]
-        for fmt in formats:
-            try:
-                return datetime.strptime(date_str.strip(), fmt)
-            except ValueError:
-                continue
+    def _parse_spanish_date(self, date_str: str) -> datetime:
+        """Parse Spanish date format like 'Ene 3, 2026, 18:42'."""
+        months = {
+            "ene": 1, "feb": 2, "mar": 3, "abr": 4,
+            "may": 5, "jun": 6, "jul": 7, "ago": 8,
+            "sep": 9, "oct": 10, "nov": 11, "dic": 12,
+        }
+
+        try:
+            # Extract components
+            match = re.match(
+                r"([A-Za-z]{3,4})\s+(\d{1,2}),?\s*(\d{4}),?\s*(\d{1,2}):(\d{2})",
+                date_str.strip(),
+            )
+            if match:
+                month_str = match.group(1).lower()[:3]
+                day = int(match.group(2))
+                year = int(match.group(3))
+                hour = int(match.group(4))
+                minute = int(match.group(5))
+
+                month = months.get(month_str, 1)
+                return datetime(year, month, day, hour, minute)
+        except (ValueError, AttributeError):
+            pass
+
+        return datetime.now()
+
+    def _parse_numeric_date(self, date_str: str, time_str: str) -> datetime:
+        """Parse numeric date format like '03/01/2026 18:42'."""
+        try:
+            # Try DD/MM/YYYY format
+            parts = re.split(r"[/-]", date_str)
+            if len(parts) == 3:
+                day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+                if year < 100:
+                    year += 2000
+
+                hour, minute = 0, 0
+                if time_str:
+                    time_parts = time_str.split(":")
+                    hour = int(time_parts[0])
+                    minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+
+                return datetime(year, month, day, hour, minute)
+        except (ValueError, IndexError):
+            pass
+
         return datetime.now()

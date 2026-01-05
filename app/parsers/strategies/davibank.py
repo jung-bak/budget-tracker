@@ -43,7 +43,7 @@ class DavibankParserStrategy(ParserStrategy):
                 currency=currency,
                 institution=self.institution,
                 payment_instrument=card_last4,
-                raw_reference=email.subject,
+                notes="",
             )
         except Exception:
             return None
@@ -72,8 +72,8 @@ class DavibankParserStrategy(ParserStrategy):
 
         return ""
 
-    def _extract_amount(self, text: str) -> tuple[int, str]:
-        """Extract amount in minor units and currency."""
+    def _extract_amount(self, text: str) -> tuple[float, str]:
+        """Extract amount in dollars with cents and currency."""
         patterns = [
             r"(?:Monto|Amount|Total)[:\s]*(?:USD|CRC|₡|\$)?\s*([\d,]+\.?\d*)",
             r"(?:USD|CRC|₡|\$)\s*([\d,]+\.?\d*)",
@@ -90,10 +90,10 @@ class DavibankParserStrategy(ParserStrategy):
                 amount_str = match.group(1)
                 return self._parse_amount(amount_str), currency
 
-        return 0, currency
+        return 0.0, currency
 
-    def _parse_amount(self, amount_str: str) -> int:
-        """Parse amount string to minor units (cents)."""
+    def _parse_amount(self, amount_str: str) -> float:
+        """Parse amount string to dollars with cents."""
         # Remove non-numeric except . and ,
         numeric = re.sub(r"[^\d.,]", "", amount_str)
 
@@ -111,9 +111,9 @@ class DavibankParserStrategy(ParserStrategy):
                 numeric = numeric.replace(",", "")
 
         try:
-            return int(float(numeric) * 100)
+            return round(float(numeric), 2)
         except ValueError:
-            return 0
+            return 0.0
 
     def _extract_card(self, text: str) -> str:
         """Extract last 4 digits of card."""
