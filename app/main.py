@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +37,15 @@ app = FastAPI(
     title="Email-to-Ledger API",
     description="Universal Transaction Gateway - Ingest bank transaction emails",
     version="0.1.0",
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize components
@@ -253,3 +263,4 @@ def serve_ui():
 
 # Mount static files for assets
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
