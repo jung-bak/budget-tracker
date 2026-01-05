@@ -25,13 +25,17 @@ budget-tracker/
 │   ├── adapters/
 │   │   └── imap_client.py   # IMAP email fetching adapter
 │   ├── parsers/
-│   │   ├── factory.py       # ParserFactory for strategy selection
+│   │   ├── factory.py       # ParserFactory for strategies
 │   │   └── strategies/
 │   │       ├── base.py      # ParserStrategy abstract base
 │   │       ├── bac.py       # BAC Credomatic parser
 │   │       └── davivienda.py # Davivienda parser
 │   └── repositories/
 │       └── csv_repo.py      # CSV ledger persistence
+├── static/                  # Frontend assets
+│   ├── index.html           # Web UI
+│   ├── styles.css           # Styles
+│   └── app.js               # Frontend logic
 ├── tests/                   # Pytest test suite
 ├── data/                    # Ledger storage directory
 ├── Dockerfile
@@ -61,11 +65,13 @@ uv sync
 ### Configuration
 
 1. Copy the environment template:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Edit `.env` with your credentials:
+
    ```env
    # API Security (required)
    API_KEY=your-secret-api-key
@@ -100,13 +106,16 @@ docker-compose up --build
 
 ## API Endpoints
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/` | No | Health check and supported institutions |
-| `POST` | `/sync` | Yes | Fetch unseen emails, parse, and save to ledger |
-| `POST` | `/backfill` | Yes | Process emails within a date range |
-| `GET` | `/transactions` | Yes | List all stored transactions |
-| `GET` | `/transactions/summary` | No | Get summary statistics |
+| Method   | Endpoint                    | Auth | Description                                    |
+| -------- | --------------------------- | ---- | ---------------------------------------------- |
+| `GET`    | `/`                         | No   | Serve Web UI                                   |
+| `GET`    | `/health`                   | No   | Health check and supported institutions        |
+| `POST`   | `/sync`                     | Yes  | Fetch unseen emails, parse, and save to ledger |
+| `POST`   | `/backfill`                 | Yes  | Process emails within a date range             |
+| `GET`    | `/transactions`             | Yes  | List all stored transactions                   |
+| `GET`    | `/transactions/summary`     | No   | Get summary statistics                         |
+| `PUT`    | `/transactions/{global_id}` | Yes  | Update a transaction                           |
+| `DELETE` | `/transactions/{global_id}` | Yes  | Delete a transaction                           |
 
 ### Authentication
 
@@ -119,12 +128,14 @@ curl -H "X-API-Key: your-secret-api-key" http://localhost:8000/transactions
 ### Examples
 
 **Sync new emails:**
+
 ```bash
 curl -X POST http://localhost:8000/sync \
   -H "X-API-Key: your-secret-api-key"
 ```
 
 **Backfill historical data:**
+
 ```bash
 curl -X POST http://localhost:8000/backfill \
   -H "X-API-Key: your-secret-api-key" \
@@ -133,6 +144,7 @@ curl -X POST http://localhost:8000/backfill \
 ```
 
 **Get all transactions:**
+
 ```bash
 curl -H "X-API-Key: your-secret-api-key" http://localhost:8000/transactions
 ```
@@ -141,16 +153,17 @@ curl -H "X-API-Key: your-secret-api-key" http://localhost:8000/transactions
 
 Each transaction is normalized to:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `global_id` | string | SHA-256 hash for deduplication |
-| `timestamp` | datetime | Transaction timestamp (ISO 8601) |
-| `merchant` | string | Merchant/payee name |
-| `amount` | integer | Amount in minor units (cents) |
-| `currency` | string | Currency code (USD, CRC) |
-| `institution` | string | Bank identifier (BAC, Davivienda) |
-| `payment_instrument` | string | Last 4 digits of card |
-| `raw_reference` | string | Original email subject |
+| Field                | Type     | Description                       |
+| -------------------- | -------- | --------------------------------- |
+| `global_id`          | string   | SHA-256 hash for deduplication    |
+| `timestamp`          | datetime | Transaction timestamp (ISO 8601)  |
+| `merchant`           | string   | Merchant/payee name               |
+| `amount`             | float    | Amount in dollars (e.g. 10.99)    |
+| `currency`           | string   | Currency code (USD, CRC)          |
+| `institution`        | string   | Bank identifier (BAC, Davivienda) |
+| `payment_instrument` | string   | Last 4 digits of card             |
+| `notes`              | string   | User notes                        |
+| `category`           | string   | Transaction category              |
 
 ## Development
 
@@ -170,6 +183,7 @@ uv run ruff format .
 ### Adding a New Bank Parser
 
 1. Create a new strategy in `app/parsers/strategies/`:
+
    ```python
    from app.parsers.strategies.base import ParserStrategy
 
@@ -188,6 +202,7 @@ uv run ruff format .
    ```
 
 2. Register it in `app/parsers/factory.py`:
+
    ```python
    from app.parsers.strategies.newbank import NewBankParserStrategy
 
