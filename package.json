@@ -1,0 +1,11 @@
+{
+  "name": "budget-tracker-root",
+  "private": true,
+  "scripts": {
+    "web": "cd frontend && npm run web",
+    "android": "cd frontend && npm run android",
+    "ios": "cd frontend && npm run ios",
+    "start": "cd frontend && npm start",
+    "test": "cd frontend && npm test"
+  }
+}
