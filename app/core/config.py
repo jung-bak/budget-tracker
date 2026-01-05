@@ -19,6 +19,8 @@ class Settings(BaseModel):
     imap_password: str = os.getenv("IMAP_PASSWORD", "")
     imap_folder: str = os.getenv("IMAP_FOLDER", "INBOX")
 
+    exchange_rate_api_key: str = os.getenv("EXCHANGE_RATE_API_KEY", "")
+
     data_dir: Path = Path(os.getenv("DATA_DIR", "data"))
     ledger_file: str = os.getenv("LEDGER_FILE", "ledger.csv")
 

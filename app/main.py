@@ -48,11 +48,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.services.exchange_rate import ExchangeRateService
+
 # Initialize components
 imap_adapter = ImapAdapter()
 parser_factory = ParserFactory()
 csv_repo = CSVRepository()
 category_repo = CategoryRepository()
+exchange_rate_service = ExchangeRateService()
 
 
 @app.get("/health")
@@ -247,6 +250,18 @@ def update_transaction(
     raise HTTPException(status_code=404, detail="Transaction not found")
 
 
+
+@app.get("/exchange-rate")
+async def get_exchange_rate(_: str = Depends(get_api_key)):
+    """Get the current USD to CRC exchange rate.
+
+    Returns:
+        dict: {"rate": float}
+    """
+    rate = await exchange_rate_service.get_usd_to_crc_rate()
+    return {"rate": rate}
+
+
 # Static files directory
 static_dir = Path(__file__).parent.parent / "static"
 static_dir.mkdir(exist_ok=True)
@@ -263,4 +278,3 @@ def serve_ui():
 
 # Mount static files for assets
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
